@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JSF to PDF Converter</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="badge">
+          <span>JSF to PDF</span>
+          <span>Offline-friendly</span>
+        </div>
+        <h1>Convert .jsf files into ready-to-share PDFs</h1>
+        <p class="lead">
+          Upload a .jsf file. The server stores it in src/ and renders a
+          matching PDF into outputs/.
+        </p>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <label for="file-input">Select a .jsf file</label>
+          <form id="upload-form">
+            <input
+              id="file-input"
+              name="file"
+              type="file"
+              accept=".jsf"
+              required
+            />
+            <button type="submit">Convert</button>
+            <div class="status" id="status"></div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="badge">Latest PDFs</div>
+          <ul class="list" id="file-list"></ul>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("upload-form");
+      const statusEl = document.getElementById("status");
+      const listEl = document.getElementById("file-list");
+      const button = form.querySelector("button");
+
+      async function refreshList() {
+        listEl.innerHTML = "";
+        try {
+          const resp = await fetch("/api/files");
+          const data = await resp.json();
+          if (!data.files || data.files.length === 0) {
+            listEl.innerHTML =
+              '<li class="list-item"><span>No PDFs yet</span></li>';
+            return;
+          }
+          data.files.forEach((name) => {
+            const li = document.createElement("li");
+            li.className = "list-item";
+            const span = document.createElement("span");
+            span.textContent = name;
+            const link = document.createElement("a");
+            link.href = `/api/download/${encodeURIComponent(name)}`;
+            link.textContent = "Download";
+            li.append(span, link);
+            listEl.appendChild(li);
+          });
+        } catch (err) {
+          listEl.innerHTML =
+            '<li class="list-item"><span>Could not load list</span></li>';
+          console.error(err);
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = document.getElementById("file-input").files[0];
+        if (!file) {
+          statusEl.textContent = "Choose a .jsf file first.";
+          return;
+        }
+        button.disabled = true;
+        statusEl.textContent = "Uploading and converting...";
+        const body = new FormData();
+        body.append("file", file);
+        try {
+          const resp = await fetch("/api/upload", { method: "POST", body });
+          if (!resp.ok) {
+            const error = await resp
+              .json()
+              .catch(() => ({ message: resp.statusText }));
+            throw new Error(error.message || "Upload failed");
+          }
+          const data = await resp.json();
+          statusEl.textContent = `Converted to ${data.output}`;
+          form.reset();
+          await refreshList();
+        } catch (err) {
+          statusEl.textContent = err.message || "Something went wrong";
+          console.error(err);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      refreshList();
+    </script>
+  </body>
+</html>

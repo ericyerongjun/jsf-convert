@@ -1,0 +1,8 @@
+node_modules
+backend/dist
+backend/.eslintcache
+__pycache__
+*.pyc
+.env
+outputs/*.pdf
+src/*.jsf
